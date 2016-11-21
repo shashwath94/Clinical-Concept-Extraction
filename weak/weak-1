@@ -1,0 +1,285 @@
+#!/usr/bin/env python
+
+######################################################################
+#  weak-1                                                            #
+#                                                                    #
+#  Willie Boag                                   wboag@csail.mit.edu #
+#                                                                    #
+#  Purpose: Command Line Interface for working with weak-1.          #
+######################################################################
+
+
+
+
+import sys
+import argparse
+import os
+import glob
+import cPickle as pickle
+
+import tools
+from documents import Document
+from model import Model
+
+
+
+def main():
+
+    commands = ['train', 'predict', 'evaluate', 'error']
+
+    help_msg = \
+    '''
+        Usage: weak-1 [OPTIONS] COMMAND [ARGS]...
+
+        Options:
+          --help  Show this message and exit.
+
+        Commands:
+            %s
+    ''' % '\n            '.join(commands)
+
+    # Is argument correct?
+    if len(sys.argv)<2 or sys.argv[1] not in commands or sys.argv[1] == '--help':
+        print >>sys.stderr, help_msg, '\n'
+        exit(1)
+
+    # select appropriate sub-command
+    subcmd = sys.argv[1]
+    del sys.argv[1]
+
+    # Call appropriate sub-command
+    if subcmd == 'train':
+        train()
+    elif subcmd == 'predict':
+        predict()
+    elif subcmd == 'evaluate':
+        import evaluate
+        evaluate.main()
+    elif subcmd == 'error':
+        print 'nope'
+        exit()
+
+
+
+
+def train():
+
+    # Parse arguments
+    parser = argparse.ArgumentParser(prog='weak-1 train')
+    parser.add_argument("--txt",
+        dest = "txt",
+        help = ".txt files of discharge summaries"
+    )
+    parser.add_argument("--annotations",
+        dest = "con",
+        help = "concept files for annotations of the .txt files",
+    )
+    parser.add_argument("--model",
+        dest = "model",
+        help = "Path to the model that should be stored",
+    )
+    parser.add_argument("--format",
+        dest = "format",
+        help = "Data format ( i2b2 )"
+    )
+
+    # Parse the command line arguments
+    args = parser.parse_args()
+
+    # Error check: Ensure that file paths are specified
+    if not args.txt:
+        print >>sys.stderr, '\n\tError: Must provide text files'
+        print >>sys.stderr,  ''
+        parser.print_help(sys.stderr)
+        print >>sys.stderr,  ''
+        exit(1)
+    if not args.con:
+        print >>sys.stderr, '\n\tError: Must provide annotations for text files'
+        print >>sys.stderr,  ''
+        parser.print_help(sys.stderr)
+        print >>sys.stderr,  ''
+        exit(1)
+    if not args.model:
+        print >>sys.stderr, '\n\tError: Must provide valid path to store model'
+        print >>sys.stderr,  ''
+        parser.print_help(sys.stderr)
+        print >>sys.stderr,  ''
+        exit(1)
+    modeldir = os.path.dirname(args.model)
+    if (not os.path.exists(modeldir)) and (modeldir != ''):
+        print >>sys.stderr, '\n\tError: dir does not exist: %s' % modeldir
+        print >>sys.stderr,  ''
+        parser.print_help(sys.stderr)
+        print >>sys.stderr,  ''
+        exit(1)
+
+    # A list of text and concept file paths
+    txt_files = glob.glob(args.txt)
+    con_files = glob.glob(args.con)
+
+    # data format
+    if not args.format:
+        print '\n\tERROR: must provide "format" argument\n'
+        exit()
+
+    # Must specify output format
+    if args.format not in ['i2b2']:
+        print >>sys.stderr, '\n\tError: Must specify output format'
+        print >>sys.stderr,   '\tAvailable formats: i2b2'
+        print >>sys.stderr, ''
+        exit(1)
+
+    # Collect training data file paths
+    txt_files_map = tools.map_files(txt_files)
+    con_files_map = tools.map_files(con_files)
+
+    training_list = []
+    for k in txt_files_map:
+        if k in con_files_map:
+            training_list.append((txt_files_map[k], con_files_map[k]))
+
+
+    model_path = args.model
+    format = args.format
+
+    # Read the data into a Document object
+    docs = []
+    for txt, con in training_list:
+        #try:
+            doc_tmp = Document(txt, con)
+            docs.append(doc_tmp)
+        #except Exception, e:
+        #    exit( '\n\tWARNING: Document Exception - %s\n\n' % str(e) )
+
+    # file names
+    if not docs:
+        print 'Error: Cannot train on 0 files. Terminating train.'
+        exit(1)
+
+    # Create a Machine Learning model
+    model = Model()
+
+    # Train the model using the Document's data
+    model.fit_from_documents(docs)
+
+    # Pickle dump
+    print '\nserializing model to %s\n' % model_path
+    with open(model_path, 'wb') as f:
+        pickle.dump(model, f)
+
+
+
+
+
+def predict():
+
+    parser = argparse.ArgumentParser(prog='weak-1 predict')
+    parser.add_argument("--txt",
+        dest = "txt",
+        help = ".txt files of discharge summaries"
+    )
+    parser.add_argument("--out",
+        dest = "output",
+        help = "The directory to write the output",
+    )
+    parser.add_argument("--model",
+        dest = "model",
+        help = "The model to use for prediction",
+    )
+    parser.add_argument("--format",
+        dest = "format",
+        help = "Data format ( con )"
+    )
+    args = parser.parse_args()
+
+    # Error check: Ensure that file paths are specified
+    if not args.txt:
+        print >>sys.stderr, '\n\tError: Must provide text files\n'
+        parser.print_help(sys.stderr)
+        print >>sys.stderr,  ''
+        exit(1)
+    if not args.output:
+        print >>sys.stderr, '\n\tError: Must provide output directory\n'
+        parser.print_help(sys.stderr)
+        print >>sys.stderr,  ''
+        exit(1)
+    if not args.model:
+        print >>sys.stderr, '\n\tError: Must provide path to model\n'
+        parser.print_help(sys.stderr)
+        print >>sys.stderr,  ''
+        exit(1)
+    if not os.path.exists(args.model):
+        print >>sys.stderr, '\n\tError: does not exist: %s\n' % args.model
+        parser.print_help(sys.stderr)
+        print >>sys.stderr,  ''
+        exit(1)
+
+
+    # Parse arguments
+    files = glob.glob(args.txt)
+    tools.mkpath(args.output)
+
+    if args.format:
+        format = args.format
+    else:
+        print '\n\tERROR: must provide "format" argument\n'
+        exit()
+
+    model_path = args.model
+    output_dir = args.output
+
+    # Must specify output format
+    if format not in ['i2b2']:
+        print >>sys.stderr, '\n\tError: Must specify output format'
+        print >>sys.stderr,   '\tAvailable formats: i2b2'
+        print >>sys.stderr, ''
+        exit(1)
+
+    # Load model
+    with open(model_path, 'rb') as f:
+        model = pickle.load(f)
+
+    # Tell user if not predicting
+    if not files:
+        print >>sys.stderr, "\n\tYou did not supply any input files\n"
+        exit(1)
+
+    # For each file, predict concept labels
+    n = len(files)
+    for i,txt in enumerate(sorted(files)):
+        note = Document(txt)
+
+        fname = os.path.splitext(os.path.basename(txt))[0] + '.con'
+        out_path = os.path.join(output_dir, fname)
+        '''
+        if os.path.exists(out_path):
+            #print '\tWARNING: prediction file already exists (%s)' % out_path
+            continue
+        '''
+
+
+        print '-' * 30
+        print '\n\t%d of %d' % (i+1,n)
+        print '\t', txt, '\n'
+
+
+        # Predict concept labels
+        labels = model.predict(note)
+
+        # Get predictions in proper format
+        output = note.write(labels)
+
+
+        # Output the concept predictions
+        print '\n\nwriting to: ', out_path
+        with open(out_path, 'w') as f:
+            print >>f, output
+        print
+
+
+
+
+if __name__ == '__main__':
+    main()
+
+
