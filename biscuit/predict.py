@@ -18,7 +18,7 @@ import argparse
 import tools
 import cPickle as pickle
 
-from model import Galen
+from model import GalenModel
 from documents import Document
 
 
@@ -119,7 +119,7 @@ def predict(files, model_path, output_dir, format):
 
 
         # Predict concept labels
-        labels = model.predict(note)
+        labels = model.predict_classes_from_document(note)
 
         # Get predictions in proper format
         output = note.write(labels)

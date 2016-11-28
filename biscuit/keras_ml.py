@@ -14,6 +14,8 @@ import os
 import random
 import time
 
+import tensorflow as tf
+tf.python.control_flow_ops = tf
 
 from keras.utils.np_utils import to_categorical
 from keras.layers.wrappers import TimeDistributed
@@ -26,13 +28,13 @@ from keras.layers import Dense, Dropout, Embedding, LSTM, Input, merge
 lstm_model = None
 
 
-def train(train_X_ids, train_Y_ids, tag2id, 
+def train(train_X_ids, train_Y_ids, tag2id,
           W=None, epochs=20, val_X_ids=None, val_Y_ids=None):
     '''
     train()
 
     Build a Keras Bi-LSTM and return an encoding of it's parameters for predicting.
-    
+
     @param train_X_ids.  A list of tokenized sents (each sent is a list of num ids)
     @param train_Y_ids.  A list of concept labels parallel to train_X_ids
     @param W.            Optional initialized word embedding matrix.
@@ -42,8 +44,8 @@ def train(train_X_ids, train_Y_ids, tag2id,
 
     @return A tuple of encoded parameter weights and hyperparameters for predicting.
     '''
-    # gotta beef it up sometimes 
-    # (I know this supposed to be the same as 5x more epochs, 
+    # gotta beef it up sometimes
+    # (I know this supposed to be the same as 5x more epochs,
     #    but it doesnt feel like it)
     #train_X_ids = train_X_ids * 15
     #train_Y_ids = train_Y_ids * 15
@@ -66,7 +68,7 @@ def train(train_X_ids, train_Y_ids, tag2id,
     print 'training begin'
     batch_size = 64
     #'''
-    history = lstm_model.fit(train_X, train_Y, 
+    history = lstm_model.fit(train_X, train_Y,
                              batch_size=batch_size, nb_epoch=epochs, verbose=1)
     #'''
     #history = {}
@@ -107,7 +109,7 @@ def predict(keras_model_tuple, X_seq_ids):
     predict()
 
     Predict concept labels for X_seq_ids using Keras Bi-LSTM.
-    
+
     @param keras_model_tuple.  A tuple of encoded parameter weights and hyperparams.
     @param X_seq_ids.          A list of tokenized sents (each is a list of num ids)
 
@@ -246,6 +248,7 @@ def create_bidirectional_lstm(input_dim, nb_classes, maxlen, W=None):
         weights = None
 
     # Embedding layer
+    
     embedding = Embedding(output_dim=embedding_size, input_dim=input_dim, input_length=maxlen, mask_zero=True, weights=weights)(sequence)
 
     # LSTM 1 input
@@ -316,3 +319,23 @@ def create_data_matrix_Y(Y_seq_onehots, nb_samples, maxlen, nb_classes):
 
     return Y
 
+def load_wv_and_wind(wv_f, vocab_f):
+    f1 = open(wv_f, 'r')
+
+    wv_map = {}
+    for line in f1:
+        entry = line.split()
+        word = entry[0]
+        embedding = [float(val) for val in entry[1:]]
+        wv_map[word] = embedding
+
+
+    f2 = open(vocab_f, 'r')
+
+    vocab_map = {}
+    for line in f2:
+        entry = line.split()
+        word = entry[0]
+        word_id = entry[1]
+        vocab_map[word] = word_id
+    return wv_map, vocab_map

@@ -17,6 +17,7 @@ import io
 import random
 from time import localtime, strftime
 
+import numpy as np
 import keras_ml
 from documents import labels as tag2id, id2tag
 from tools import flatten
@@ -131,7 +132,7 @@ class GalenModel:
 
         @param tok_sents.  A list of sentences, where each sentence is tokenized
                              into words
-        @param tags.       Parallel to `tokenized_sents`, 7-way labels for 
+        @param tags.       Parallel to `tokenized_sents`, 7-way labels for
                              concept spans
         @param val_sents.  Validation data. Same format as tokenized_sents
         @param val_tags.   Validation data. Same format as iob_nested_labels
@@ -155,7 +156,7 @@ class GalenModel:
         self._log = self.__log_str()
 
 
-    def predict_classes_from_document(self, document):
+    def predict_classes_from_document(self, note):
         """
         GalenModel::predict_classes_from_documents()
 
@@ -191,7 +192,7 @@ class GalenModel:
 
 
 
-def generic_train(p_or_n, tokenized_sents, iob_nested_labels, 
+def generic_train(p_or_n, tokenized_sents, iob_nested_labels,
                   val_sents=None, val_labels=None, dev_split=None):
     '''
     generic_train()
@@ -201,7 +202,7 @@ def generic_train(p_or_n, tokenized_sents, iob_nested_labels,
     @param p_or_n.             A string that indicates "prose", "nonprose", or "all"
     @param tokenized_sents.    A list of sentences, where each sentence is tokenized
                                  into words
-    @param iob_nested_labels.  Parallel to `tokenized_sents`, 7-way labels for 
+    @param iob_nested_labels.  Parallel to `tokenized_sents`, 7-way labels for
                                  concept spans
     @param val_sents.          Validation data. Same format as tokenized_sents
     @param val_labels.         Validation data. Same format as iob_nested_labels
@@ -257,7 +258,7 @@ def generic_train(p_or_n, tokenized_sents, iob_nested_labels,
     '''
     for w in oov:
         print w
-    print 
+    print
     print len(oov)
     print len(freq)
     '''
@@ -278,6 +279,36 @@ def generic_train(p_or_n, tokenized_sents, iob_nested_labels,
             if (w not in vocab) and (w not in oov):
                 vocab[w] = len(vocab) + 1
     vocab['oov'] = len(vocab) + 1
+
+    filename = 'vectors.txt'
+    f = open(filename, 'r')
+    embedding_size = 300
+
+    model = {}
+    weights = {}
+    for line in f:
+        entry = line.split()
+        word = entry[0]
+        embedding = [float(val) for val in entry[1:]]
+        model[word] = embedding
+
+    for word in vocab.keys():
+        if word in model.keys():
+            id = vocab[word]
+            vector = model[word]
+            weights[id] = vector
+        else:
+            weights[vocab[word]] = model['<unk>']
+    weights['oov'] = model['<unk>']
+    #print weights[vocab['fever']]
+
+    weight_matrix = np.zeros((len(weights), embedding_size))
+    for i in range(1,len(weights)):
+        if i in weights.keys():
+            weight_matrix[i] = weights[i]
+    #print weights
+
+
 
     # vectorize tokenized sentences
     X_seq_ids = []
@@ -302,12 +333,12 @@ def generic_train(p_or_n, tokenized_sents, iob_nested_labels,
             val_X.append(id_seq)
         # vectorize validation Y
         val_Y = [ [tag2id[y] for y in y_seq] for y_seq in val_labels ]
-        # rename 
+        # rename
         val_sents  = val_X
         val_labels = val_Y
 
     # train using lstm
-    clf, dev_score  = keras_ml.train(X_seq_ids, Y_labels, tag2id, 
+    clf, dev_score  = keras_ml.train(X_seq_ids, Y_labels, tag2id, weight_matrix,
                                      val_X_ids=val_sents, val_Y_ids=val_labels)
 
     return vocab, clf, dev_score
@@ -396,4 +427,3 @@ def print_vec(f, label, vec):
             f.write(unicode('%7.3f' % featname))
         f.write(u'\n')
         start += COLUMNS
-

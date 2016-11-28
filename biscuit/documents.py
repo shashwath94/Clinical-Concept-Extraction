@@ -208,16 +208,17 @@ def read_i2b2(txt, con):
         tok_concepts = sorted(tok_concepts, cmp=classification_cmp)
 
         # Ensure no overlapping concepts (that would be bad)
-        for i in range(len(tok_concepts)-1):
+        '''for i in range(len(tok_concepts)-1):
             c1 = tok_concepts[i]
             c2 = tok_concepts[i+1]
             if c1[1] == c2[1]:
                 if c1[2] <= c2[2] and c2[2] <= c1[3]:
-                    fname = os.path.basenme(con)
+                    fname = os.path.basename(con)
                     error1='%s has overlapping entities on line %d'%(fname,c1[1])
                     error2="It can't be processed until you remove one"
                     error_msg = '%s\n%s' % (error1,error2)
                     raise DocumentException(error_msg)
+	'''
 
     return tokenized_sents, tok_concepts
 
