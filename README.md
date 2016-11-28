@@ -9,3 +9,5 @@ training command: python biscuit/galen train --txt "data/train/txt/.txt" --annot
 prediction command: python biscuit/galen predict --txt "data/test/txt/*.txt" --model models/word-ls --out data/predictions/conex-test --format i2b2
 
 evaluation command: python biscuit/galen evaluate --predictions data/predictions/conex-test/ --gold data/test/con/ --format i2b2
+
+Using code originally from https://github.com/wboag/conex
