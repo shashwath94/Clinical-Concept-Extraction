@@ -1,6 +1,7 @@
 # conex
 Concept Extraction in clinical notes
 
+Uses a Bi-Directional LSTM with GloVe word embeddings and character embeddings in Keras
 
 Run the following commands to execute the model:
 
